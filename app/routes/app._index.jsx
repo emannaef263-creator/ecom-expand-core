@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useFetcher, useLoaderData } from "react-router";
 import { authenticate, PRO_PLAN } from "../shopify.server";
 
@@ -32,7 +32,7 @@ export const action = async ({ request }) => {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: "openai/gpt-oss-20b",
+      model: "llama-3.3-70b-versatile",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.7,
       response_format: { type: "json_object" }
