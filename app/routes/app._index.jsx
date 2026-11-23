@@ -25,7 +25,7 @@ export const action = async ({ request }) => {
 
   const prompt = `You are an e-commerce expert. Generate a JSON object for a product named "${title}" with features: ${features} in ${language} language. The JSON MUST have exactly these 4 keys: "descriptionHtml" (HTML formatted with <p>,<ul>,<li>,<strong>), "seoTitle" (max 60 chars), "tags" (array of 5 short tags), and "suggestedPrice" (number in USD like 49.99). Return ONLY valid JSON.`;
 
-  const aiResponse = await fetch("https://groq.com", {
+  const aiResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
