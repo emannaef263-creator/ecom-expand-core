@@ -48,7 +48,7 @@ export default defineConfig({
       allow: ["app", "node_modules"],
     },
   },
-  plugins: [reactRouter(), tsconfigPaths()],
+  plugins: [reactRouter({ allowedActionOrigins: ["*"] }), tsconfigPaths()],
   build: {
     assetsInlineLimit: 0,
   },
