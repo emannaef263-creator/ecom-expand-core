@@ -1,92 +1,30 @@
-import { useState, useEffect } from "react";
-import { useFetcher, useLoaderData } from "react-router";
-import { authenticate, PRO_PLAN } from "../shopify.server";
-
+import { useState } from 'react';
+import { useFetcher } from 'react-router';
+import { authenticate } from '../shopify.server';
 export const loader = async ({ request }) => {
-  await authenticate.admin(request); return { isPro: true };
+ const { admin } = await authenticate.admin(request);
+ const url = new URL(request.url);
+ const title = url.searchParams.get('title');
+ if (!title) return null;
+ const features = url.searchParams.get('features') || '';
+ const language = url.searchParams.get('language') || 'Arabic';
+ const aiResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+ method: 'POST',
+ headers: { Authorization: 'Bearer ' + process.env.GROQ_API_KEY, 'Content-Type': 'application/json' },
+ body: JSON.stringify({
+ model: 'llama-3.3-70b-versatile',
+ messages: [{ role: 'user', content: 'Return ONLY valid JSON with keys descriptionHtml, seoTitle, tags (array), suggestedPrice (string) in ' + language + ' for product: ' + title + '. Features: ' + features }],
+ response_format: { type: 'json_object' }
+ })
+ });
+ const aiData = await aiResponse.json();
+ let parsed = { descriptionHtml: '', seoTitle: title, tags: [], suggestedPrice: '29.99' };
+ try { parsed = JSON.parse(aiData.choices?.[0]?.message?.content || '{}'); } catch (e) {}
+ await admin.graphql('#graphql\n mutation createAIProduct($product: ProductCreateInput!) { productCreate(product: $product) { product { id } } }', {
+ variables: { product: { title, descriptionHtml: parsed.descriptionHtml, tags: parsed.tags || [], seo: { title: parsed.seoTitle || title } } }
+ });
+ return { aiResult: parsed };
 };
-
-export const loader = async ({ request }) => { const url = new URL(request.url); if (!url.searchParams.get("title")) { await authenticate.admin(request); return null; }
-  const { admin, billing } = await authenticate.admin(request);
-  
-  const intent = url.searchParams.get("intent");
-
-  if (intent === "subscribe") {
-    const result = await billing.request({
-      plan: PRO_PLAN,
-      isTest: true,
-    });
-    return { confirmationUrl: result.confirmationUrl };
-  }
-
-  const title = url.searchParams.get("title") || "Smart Watch";
-  const features = url.searchParams.get("features") || "Waterproof, 7-day battery";
-  const language = url.searchParams.get("language") || "Arabic";
-
-  const prompt = `You are an e-commerce expert. Generate a JSON object for a product named "${title}" with features: ${features} in ${language} language. The JSON MUST have exactly these 4 keys: "descriptionHtml" (HTML formatted with <p>,<ul>,<li>,<strong>), "seoTitle" (max 60 chars), "tags" (array of 5 short tags), and "suggestedPrice" (number in USD like 49.99). Return ONLY valid JSON.`;
-
-  const aiResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "GET",
-    headers: {
-      "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-      response_format: { type: "json_object" }
-    })
-  });
-
-  const aiData = await aiResponse.json();
-  let parsed = { descriptionHtml: "", seoTitle: title, tags: [], suggestedPrice: "29.99" };
-  try {
-    parsed = JSON.parse(aiData.choices?.[0]?.message?.content || "{}");
-  } catch (e) {}
-
-  const response = await admin.graphql(
-    `#graphql
-    mutation createAIProduct($product: ProductCreateInput!) {
-      productCreate(product: $product) {
-        product { id title variants(first:1) { edges { node { id } } } }
-      }
-    }`,
-    {
-      variables: {
-        product: {
-          title,
-          descriptionHtml: parsed.descriptionHtml,
-          tags: parsed.tags || [],
-          seo: { title: parsed.seoTitle || title }
-        }
-      }
-    }
-  );
-  const responseJson = await response.json();
-  const createdProduct = responseJson.data?.productCreate?.product;
-  const variantId = createdProduct?.variants?.edges?.[0]?.node?.id;
-
-  if (createdProduct?.id && variantId) {
-    await admin.graphql(
-      `#graphql
-      mutation updatePrice($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-        productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-          productVariants { id }
-        }
-      }`,
-      {
-        variables: {
-          productId: createdProduct.id,
-          variants: [{ id: variantId, price: String(parsed.suggestedPrice || "29.99") }]
-        }
-      }
-    );
-  }
-
-  return { product: createdProduct, aiResult: parsed };
-};
-
 export default function Index() {
   const { isPro } = useLoaderData();
   const fetcher = useFetcher();
