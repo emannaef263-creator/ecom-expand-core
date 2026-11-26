@@ -6,10 +6,10 @@ export const loader = async ({ request }) => {
   await authenticate.admin(request); return { isPro: true };
 };
 
-export const action = async ({ request }) => {
+export const loader = async ({ request }) => { const url = new URL(request.url); if (!url.searchParams.get("title")) { await authenticate.admin(request); return null; }
   const { admin, billing } = await authenticate.admin(request);
-  const formData = await request.formData();
-  const intent = formData.get("intent");
+  
+  const intent = url.searchParams.get("intent");
 
   if (intent === "subscribe") {
     const result = await billing.request({
@@ -19,14 +19,14 @@ export const action = async ({ request }) => {
     return { confirmationUrl: result.confirmationUrl };
   }
 
-  const title = formData.get("title") || "Smart Watch";
-  const features = formData.get("features") || "Waterproof, 7-day battery";
-  const language = formData.get("language") || "Arabic";
+  const title = url.searchParams.get("title") || "Smart Watch";
+  const features = url.searchParams.get("features") || "Waterproof, 7-day battery";
+  const language = url.searchParams.get("language") || "Arabic";
 
   const prompt = `You are an e-commerce expert. Generate a JSON object for a product named "${title}" with features: ${features} in ${language} language. The JSON MUST have exactly these 4 keys: "descriptionHtml" (HTML formatted with <p>,<ul>,<li>,<strong>), "seoTitle" (max 60 chars), "tags" (array of 5 short tags), and "suggestedPrice" (number in USD like 49.99). Return ONLY valid JSON.`;
 
   const aiResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
+    method: "GET",
     headers: {
       "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
       "Content-Type": "application/json"
@@ -109,7 +109,7 @@ export default function Index() {
             <s-stack direction="block" gap="base">
               <p><strong>Pro Monthly Plan - $19.99/month</strong> (7-day Free Trial)</p>
               <p>Unlock unlimited AI Product Descriptions, SEO Titles, Smart Tags, and Auto-Pricing in 6 languages.</p>
-              <s-button onClick={() => fetcher.submit({ intent: "subscribe" }, { method: "POST" })} {...(isLoading ? { loading: true } : {})}>
+              <s-button onClick={() => fetcher.submit({ intent: "subscribe" }, { method: "GET" })} {...(isLoading ? { loading: true } : {})}>
                 Start 7-Day Free Trial ($19.99/mo)
               </s-button>
             </s-stack>
@@ -129,7 +129,7 @@ export default function Index() {
               <option value="German">German</option>
               <option value="Turkish">Turkish</option>
             </select>
-            <s-button onClick={() => fetcher.submit({ title, features, language }, { method: "POST" })} {...(isLoading ? { loading: true } : {})}>
+            <s-button onClick={() => fetcher.submit({ title, features, language }, { method: "GET" })} {...(isLoading ? { loading: true } : {})}>
               Generate Full Product (Description + SEO + Tags + Price)
             </s-button>
           </s-stack>
@@ -149,4 +149,5 @@ export default function Index() {
     </s-page>
   );
 }
+
 
